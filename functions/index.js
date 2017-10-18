@@ -95,14 +95,14 @@ const TTS_DELAY = '500ms';
 const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
 const SUGGESTION_CHIPS_MAX = 8;
-const GAME_TITLE = 'The Fun Trivia Game';
-const QUESTIONS_PER_GAME = 4;
+const GAME_TITLE = 'The Yong-San-Go GoldenBell';
+const QUESTIONS_PER_GAME = 1;
 
 // Firebase data keys
 const DATABASE_PATH_USERS = 'users/';
 const DATABASE_PATH_DICTIONARY = 'dictionary/';
 const DATABASE_QUESTIONS = 'questions';
-const DATABASE_DATA = 'data';
+const DATABASE_DATA = 'data2/level1';
 const DATABASE_PREVIOUS_QUESTIONS = 'previousQuestions';
 const DATABASE_HIGHEST_SCORE = 'highestScore';
 const DATABASE_LOWEST_SCORE = 'lowestScore';
@@ -113,7 +113,7 @@ const DATABASE_VISITS = 'visits';
 const DATABASE_ANSWERS = 'answers';
 const DATABASE_FOLLOW_UPS = 'followUps';
 
-const theme = THEME_TYPES.TRIVIA_TEACHER_THEME;
+const theme = THEME_TYPES.TRIVIA_GOLDENBELL_THEME;
 const AUDIO_BASE_URL = `${HOSTING_URL}/audio/`;
 
 // Cloud Functions for Firebase entry point

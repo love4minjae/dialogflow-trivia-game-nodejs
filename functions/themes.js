@@ -25,9 +25,7 @@ const { logObject } = require('./utils');
 const utils = require('./utils');
 
 const THEME_TYPES = {
-  TRIVIA_TEACHER_THEME: 'Teacher',
-  TRIVIA_QUEEN_THEME: 'Queen',
-  TRIVIA_TRIVIA_BOT_THEME: 'TriviaBot'
+  TRIVIA_GOLDENBELL_THEME: 'GoldenBell'
 };
 
 const PROMPT_TYPES = {
@@ -95,12 +93,8 @@ const AUDIO_TYPES = {
   AUDIO_CALCULATING: 'AUDIO_CALCULATING'
 };
 
-const teacherPrompts = require('./data/teacherPrompts.json');
-const triviaBotPrompts = require('./data/triviaBotPrompts.json');
-const queenPrompts = require('./data/queenPrompts.json');
-const teacherAudio = require('./data/teacherAudio.json');
-const triviaBotAudio = require('./data/triviaBotAudio.json');
-const queenAudio = require('./data/queenAudio.json');
+const goldenBellPrompts = require('./data/goldenBellPrompts.json');
+const goldenBellAudio = require('./data/goldenBellAudio.json');
 
 // Class to manage loading and accessing the theme prompts and audio resources
 const Themes = class {
@@ -110,13 +104,9 @@ const Themes = class {
     }));
 
     this.prompts = [];
-    this.prompts[THEME_TYPES.TRIVIA_TEACHER_THEME] = teacherPrompts;
-    this.prompts[THEME_TYPES.TRIVIA_QUEEN_THEME] = queenPrompts;
-    this.prompts[THEME_TYPES.TRIVIA_TRIVIA_BOT_THEME] = triviaBotPrompts;
+    this.prompts[THEME_TYPES.TRIVIA_GOLDENBELL_THEME] = goldenBellPrompts;
     this.audio = [];
-    this.audio[THEME_TYPES.TRIVIA_TEACHER_THEME] = teacherAudio;
-    this.audio[THEME_TYPES.TRIVIA_QUEEN_THEME] = queenAudio;
-    this.audio[THEME_TYPES.TRIVIA_TRIVIA_BOT_THEME] = triviaBotAudio;
+    this.audio[THEME_TYPES.TRIVIA_GOLDENBELL_THEME] = goldenBellAudio;
   }
 
   // Get prompts for theme and type
