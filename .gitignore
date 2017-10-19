@@ -1,4 +1,33 @@
-node_modules
-*.DS_store
-npm-debug.log
-.firebaserc
+# C extensions
+*.so
+
+# Distribution / packaging
+node_modules/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+
+# Translations
+*.mo
+*.pot
+
+# Vagrant
+.vagrant
+
+# Misc
+.DS_Store
+temp
+.idea/
+*.log
+
+# Project
+backups
+settings.cfg

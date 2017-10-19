@@ -91,18 +91,20 @@ const TRUE_FALSE_CONTEXT = 'true_false';
 const ITEM_INTENT = 'game.choice.item';
 
 const TTS_DELAY = '500ms';
+const TTS_DELAY_LONG = '1000ms';
 
 const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
 const SUGGESTION_CHIPS_MAX = 8;
 const GAME_TITLE = 'The Yong-San-Go GoldenBell';
-const QUESTIONS_PER_GAME = 1;
+const QUESTIONS_PER_GAME = 3;
 
 // Firebase data keys
 const DATABASE_PATH_USERS = 'users/';
 const DATABASE_PATH_DICTIONARY = 'dictionary/';
 const DATABASE_QUESTIONS = 'questions';
-const DATABASE_DATA = 'data2/level1';
+// const DATABASE_DATA = 'data';
+const DATABASE_DATA = 'data2/level2';
 const DATABASE_PREVIOUS_QUESTIONS = 'previousQuestions';
 const DATABASE_HIGHEST_SCORE = 'highestScore';
 const DATABASE_LOWEST_SCORE = 'lowestScore';
@@ -499,7 +501,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         const synonyms = getSynonyms(answers[i]);
         if (synonyms && synonyms.length > 0) {
           const synonym = synonyms[0].trim();
-          ssmlResponse.pause(TTS_DELAY);
+          ssmlResponse.pause(TTS_DELAY_LONG);
           if (i === answers.length - 2) {
             ssmlResponse.say(`${synonym}, `);
           } else if (i === answers.length - 1) {
