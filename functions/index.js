@@ -97,14 +97,15 @@ const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
 const SUGGESTION_CHIPS_MAX = 8;
 const GAME_TITLE = 'The Yong-San-Go GoldenBell';
-const QUESTIONS_PER_GAME = 3;
+const QUESTIONS_PER_GAME = 2;
 
 // Firebase data keys
 const DATABASE_PATH_USERS = 'users/';
 const DATABASE_PATH_DICTIONARY = 'dictionary/';
 const DATABASE_QUESTIONS = 'questions';
 // const DATABASE_DATA = 'data';
-const DATABASE_DATA = 'data2/level2';
+const DATABASE_DATA = 'data2';
+const DATABASE_CONFIG = 'config';
 const DATABASE_PREVIOUS_QUESTIONS = 'previousQuestions';
 const DATABASE_HIGHEST_SCORE = 'highestScore';
 const DATABASE_LOWEST_SCORE = 'lowestScore';
@@ -288,8 +289,8 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   };
 
   // Start a new round of the game by selecting new questions
-  const startNewRound = (callback) => {
-    firebaseAdmin.database().ref(DATABASE_DATA)
+  const startNewRound = (round, callback) => {
+    firebaseAdmin.database().ref(DATABASE_DATA).child(app.data.config['rounds'][round])
       .once('value', (data) => {
         if (data && data.val() && data.val()[DATABASE_QUESTIONS]) {
           questions = data.val()[DATABASE_QUESTIONS];
@@ -339,6 +340,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
               app.data.currentQuestion = currentQuestion;
               app.data.gameLength = gameLength;
               app.data.fallbackCount = 0;
+              app.data.currentRound = round;
               callback(null);
             } else {
               callback(new Error('There is a problem with the answers.'));
@@ -443,24 +445,31 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         }
         app.data.previousQuestions = previousQuestions;
 
-        startNewRound((error) => {
-          if (error) {
-            app.tell(error.message);
-          } else {
-            const ssmlResponse = new Ssml();
-            ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_GAME_INTRO), 'game intro');
-            if (alternateWelcomePrompt) {
-              ssmlResponse.say(alternateWelcomePrompt);
-            } else if (newUser) {
-              ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.GREETING_PROMPTS_1), GAME_TITLE));
-            } else {
-              ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.GREETING_PROMPTS_2), GAME_TITLE));
-            }
-            ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.INTRODUCTION_PROMPTS));
-            ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.FIRST_ROUND_PROMPTS));
-            ssmlResponse.pause(TTS_DELAY);
-            askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
+        firebaseAdmin.database().ref(DATABASE_CONFIG)
+        .once('value', (data) => {
+          if (data && data.val()) {
+            app.data.config = data.val();
           }
+
+          startNewRound(0, (error) => {
+            if (error) {
+              app.tell(error.message);
+            } else {
+              const ssmlResponse = new Ssml();
+              ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_GAME_INTRO), 'game intro');
+              if (alternateWelcomePrompt) {
+                ssmlResponse.say(alternateWelcomePrompt);
+              } else if (newUser) {
+                ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.GREETING_PROMPTS_1), GAME_TITLE));
+              } else {
+                ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.GREETING_PROMPTS_2), GAME_TITLE));
+              }
+              ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.INTRODUCTION_PROMPTS));
+              ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.FIRST_ROUND_PROMPTS));
+              ssmlResponse.pause(TTS_DELAY);
+              askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
+            }
+          });
         });
       });
   };
@@ -612,36 +621,51 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     gameLength = parseInt(app.data.gameLength);
     let currentQuestion = parseInt(app.data.currentQuestion);
     const score = parseInt(app.data.score);
+    const currentRound = parseInt(app.data.currentRound);
+    const lastRound = app.data.config['rounds'].length - 1;
 
     // Last question
     if (currentQuestion === gameLength - 1) {
-      ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_ROUND_ENDED), 'round ended');
-      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_1));
-      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_2));
-      ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CALCULATING), 'calculating');
-      ssmlResponse.pause(TTS_DELAY);
-      if (score === gameLength) {
-        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ALL_CORRECT_PROMPTS), score));
-      } else if (score === 0) {
-        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.NONE_CORRECT_PROMPTS), score));
+      if (currentRound >= lastRound) {
+        ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_ROUND_ENDED), 'round ended');
+        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_1));
+        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_2));
+        ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CALCULATING), 'calculating');
+        ssmlResponse.pause(TTS_DELAY);
+        if (score === gameLength) {
+          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ALL_CORRECT_PROMPTS), score));
+        } else if (score === 0) {
+          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.NONE_CORRECT_PROMPTS), score));
+        } else {
+          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.SOME_CORRECT_PROMPTS), score));
+        }
+        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.PLAY_AGAIN_QUESTION_PROMPTS));
+        app.setContext(PLAY_AGAIN_CONTEXT);
+        if (hasScreen) {
+          app.ask(app
+            .buildRichResponse()
+            .addSimpleResponse(ssmlResponse.toString())
+            .addSuggestions([utils.YES, utils.NO]));
+        } else {
+          app.ask(ssmlResponse.toString(), selectInputPrompts());
+        }
+        persistScore();
       } else {
-        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.SOME_CORRECT_PROMPTS), score));
+        startNewRound(currentRound + 1, (error) => {
+          if (error) {
+            app.tell(error.message);
+          } else {
+            const ssmlResponse = new Ssml();
+            ssmlResponse.say('Now, going to next level.');
+            ssmlResponse.pause(TTS_DELAY);
+            askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
+          }
+        });
       }
-      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.PLAY_AGAIN_QUESTION_PROMPTS));
-      app.setContext(PLAY_AGAIN_CONTEXT);
-      if (hasScreen) {
-        app.ask(app
-          .buildRichResponse()
-          .addSimpleResponse(ssmlResponse.toString())
-          .addSuggestions([utils.YES, utils.NO]));
-      } else {
-        app.ask(ssmlResponse.toString(), selectInputPrompts());
-      }
-      persistScore();
     } else {
       // Not the last question
       currentQuestion++;
-      if (currentQuestion === gameLength - 1) {
+      if (currentQuestion === gameLength - 1 && currentRound === lastRound) {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.FINAL_ROUND_PROMPTS));
       } else if (currentQuestion % 2 === 1) {
         ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ROUND_PROMPTS), (currentQuestion + 1)));
@@ -957,7 +981,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
       rawInput: app.getRawInput()
     }));
 
-    startNewRound((error) => {
+    startNewRound(0, (error) => {
       if (error) {
         app.tell(error.message);
       } else {

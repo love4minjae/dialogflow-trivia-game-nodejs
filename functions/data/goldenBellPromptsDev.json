@@ -3,7 +3,7 @@
     "Welcome to %s."
   ],
   "GREETING_PROMPTS_2": [
-    "Welcome again"
+    "Welcome again."
   ],
   "INTRODUCTION_PROMPTS": [
     "Let's get started.",
@@ -33,7 +33,6 @@
   ],
   "RIGHT_ANSWER_PROMPTS_1": [
     "You're right!",
-    "You answered. The. Heck. Out of that one.",
     "Yes! I double checked, and you're actually right.",
     "That's not...incorrect. Which means it's correct.",
     "Nailed it! You must read a lot...or something.",
