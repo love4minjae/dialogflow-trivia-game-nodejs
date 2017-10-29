@@ -187,7 +187,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   };
 
   // Select new questions, avoiding the previous questions
-  const selectQuestions = (questions) => {
+  const selectQuestions = (questions, round) => {
     logger.debug(logObject('trivia', 'post', {
       info: 'selectQuestions'
     }));
@@ -213,21 +213,24 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     }));
 
     const selected = [];
-    if (previousQuestions.length > MAX_PREVIOUS_QUESTIONS ||
-        previousQuestions.length >= questions.length) {
-      previousQuestions = previousQuestions.slice(gameLength, previousQuestions.length);
+    for (var key in previousQuestions) {
+      if (previousQuestions[key].length > MAX_PREVIOUS_QUESTIONS ||
+        previousQuestions[key].length >= questions.length) {
+        previousQuestions[key] = previousQuestions[key].slice(gameLength, previousQuestions[key].length);
+      }
     }
     let i = 0;
     const checked = [];
     let index = 0;
     let previousIndex = 0;
     let found;
+    let roundKey = app.data.config['rounds'][round];
     // Select new questions, avoiding previous questions
     while (i < gameLength) {
       found = false;
       while (checked.length !== questions.length) {
         index = utils.getRandomNumber(0, questions.length - 1);
-        if (selected.indexOf(index) === -1 && previousQuestions.indexOf(index) === -1) {
+        if (selected.indexOf(index) === -1 && previousQuestions[roundKey].indexOf(index) === -1) {
           selected.push(index);
           i++;
           found = true;
@@ -238,7 +241,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         }
       }
       if (!found) {
-        selected.push(previousQuestions[previousIndex++]);
+        selected.push(previousQuestions[roundKey][previousIndex++]);
         i++;
       }
     }
@@ -246,7 +249,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     logger.debug(logObject('trivia', 'post', {
       selected: JSON.stringify(selected)
     }));
-    previousQuestions = previousQuestions.concat(selected);
+    previousQuestions[roundKey] = previousQuestions[roundKey].concat(selected);
     app.data.previousQuestions = previousQuestions;
     firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey).update({
       [DATABASE_PREVIOUS_QUESTIONS]: previousQuestions
@@ -296,7 +299,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
           questions = data.val()[DATABASE_QUESTIONS];
           answers = data.val()[DATABASE_ANSWERS];
           followUps = data.val()[DATABASE_FOLLOW_UPS];
-          const selectedQuestions = selectQuestions(questions);
+          const selectedQuestions = selectQuestions(questions, round);
           // Construct the initial response
           if (selectedQuestions) {
             const currentQuestion = 0;
@@ -418,38 +421,42 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
       info: 'Handling main intent'
     }));
 
-    // Check if the user is new
-    firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey)
+    firebaseAdmin.database().ref(DATABASE_CONFIG)
       .once('value', (data) => {
-        let newUser = true;
-        let previousQuestions = [];
-        if (data && data.val() && data.val()[DATABASE_VISITS]) {
-          // Previously visited
-          newUser = false;
-          const visits = data.val()[DATABASE_VISITS] + 1;
-          firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey).update({
-            [DATABASE_VISITS]: visits
-          });
-          if (data.val()[DATABASE_PREVIOUS_QUESTIONS]) {
-            previousQuestions = data.val()[DATABASE_PREVIOUS_QUESTIONS];
-            logger.debug(logObject('trivia', 'mainIntent', {
-              info: 'Has previous questions',
-              previousQuestions: JSON.stringify(previousQuestions)
-            }));
-          }
-        } else {
-          // First time user
-          firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey).update({
-            [DATABASE_VISITS]: 1
-          });
+        if (data && data.val()) {
+          app.data.config = data.val();
         }
-        app.data.previousQuestions = previousQuestions;
 
-        firebaseAdmin.database().ref(DATABASE_CONFIG)
+        // Check if the user is new
+        firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey)
         .once('value', (data) => {
-          if (data && data.val()) {
-            app.data.config = data.val();
+          let newUser = true;
+          let previousQuestions = {};
+          for (var key in app.data.config['rounds']) {
+            previousQuestions[app.data.config['rounds'][key]] = [];
           }
+          if (data && data.val() && data.val()[DATABASE_VISITS]) {
+            // Previously visited
+            newUser = false;
+            const visits = data.val()[DATABASE_VISITS] + 1;
+            firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey).update({
+              [DATABASE_VISITS]: visits
+            });
+            // let firstRoundName = app.data.config['rounds'][0];
+            if (data.val()[DATABASE_PREVIOUS_QUESTIONS]) {
+              previousQuestions = data.val()[DATABASE_PREVIOUS_QUESTIONS];
+              logger.debug(logObject('trivia', 'mainIntent', {
+                info: 'Has previous questions',
+                previousQuestions: JSON.stringify(previousQuestions)
+              }));
+            }
+          } else {
+            // First time user
+            firebaseAdmin.database().ref(DATABASE_PATH_USERS).child(userIdKey).update({
+              [DATABASE_VISITS]: 1
+            });
+          }
+          app.data.previousQuestions = previousQuestions;
 
           startNewRound(0, (error) => {
             if (error) {
@@ -656,7 +663,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
             app.tell(error.message);
           } else {
             const ssmlResponse = new Ssml();
-            ssmlResponse.say('Now, going to next level.');
+            ssmlResponse.say('Now, going up to next level.');
             ssmlResponse.pause(TTS_DELAY);
             askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
           }
