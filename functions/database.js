@@ -188,7 +188,7 @@ function readTabConfig(auth) {
         tabConfig[i]['title'] = row[1];
         tabConfig[i]['type'] = row[2];
         tabConfig[i]['round'] = row[3];
-        tabConfig[i]['questions_per_round'] = row[4];
+        tabConfig[i]['questionsPerRound'] = row[4];
 
         if (tabConfig[i]['round'] >= 0) {
           configs['rounds'][tabConfig[i]['round']] = tabConfig[i]['tab'];
@@ -215,7 +215,7 @@ function readData(auth, index) {
     if (rows.length == 0) {
       console.log('No data found.');
     } else {
-      var tab = {'questions': [], 'answers': [], 'followUps': [], 'dictionary': []};
+      var tab = {'questions': [], 'answers': [], 'followUps': [], 'dictionary': [], 'config': {}};
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         // console.log(row[0]);
@@ -225,6 +225,8 @@ function readData(auth, index) {
         tab['answers'][i][0] = row[1] || '';
         tab['answers'][i][1] = row[2] || '';
         tab['answers'][i][2] = row[3] || '';
+        tab['config']['title'] = tabConfig[index]['title'];
+        tab['config']['questionsPerRound'] = tabConfig[index]['questionsPerRound'];
       }
       data[configs['rounds'][index]] = tab;
     }
