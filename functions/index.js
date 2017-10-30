@@ -339,7 +339,9 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
               app.data.sessionAnswers = sessionAnswers;
               app.data.sessionFollowUps = sessionFollowUps;
               app.data.questionPrompt = questionPrompt;
-              app.data.score = 0;
+              if (round === 0) {
+                app.data.score = 0;
+              }
               app.data.currentQuestion = currentQuestion;
               app.data.gameLength = gameLength;
               app.data.fallbackCount = 0;
@@ -662,7 +664,6 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
           if (error) {
             app.tell(error.message);
           } else {
-            const ssmlResponse = new Ssml();
             ssmlResponse.say('Now, going up to next level.');
             ssmlResponse.pause(TTS_DELAY);
             askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
@@ -675,7 +676,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
       if (currentQuestion === gameLength - 1 && currentRound === lastRound) {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.FINAL_ROUND_PROMPTS));
       } else if (currentQuestion % 2 === 1) {
-        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ROUND_PROMPTS), (currentQuestion + 1)));
+        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ROUND_PROMPTS), (gameLength * currentRound) + (currentQuestion + 1)));
       } else if (app.data.correct) {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.NEXT_QUESTION_PROMPTS));
       } else {
