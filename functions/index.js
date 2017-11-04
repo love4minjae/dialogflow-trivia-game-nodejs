@@ -97,7 +97,8 @@ const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
 const SUGGESTION_CHIPS_MAX = 8;
 const GAME_TITLE = 'The Yong-San-Go GoldenBell';
-const QUESTIONS_PER_GAME = 2;
+const QUESTIONS_PER_GAME = 6;
+const QUESTIONS_PER_ROUND = 2;
 
 // Firebase data keys
 const DATABASE_PATH_USERS = 'users/';
@@ -136,6 +137,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   let answers = [];
   let followUps = [];
   let gameLength = QUESTIONS_PER_GAME;
+  let roundLength = QUESTIONS_PER_ROUND;
   let last = false;
   let middle = false;
   let ssmlNoInputPrompts;
@@ -197,26 +199,26 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
       }));
       return null;
     }
-    if (gameLength > questions.length) {
+    if (roundLength > questions.length) {
       logger.error(logObject('trivia', 'post', {
         info: 'selectQuestions: Not enough questions.',
-        gameLength: gameLength,
+        roundLength: roundLength,
         questions: questions.length
       }));
-      gameLength = questions.length;
+      roundLength = questions.length;
     }
     let previousQuestions = app.data.previousQuestions;
     logger.debug(logObject('trivia', 'post', {
       previousQuestions: JSON.stringify(previousQuestions),
       questions: questions.length,
-      gameLength: gameLength
+      roundLength: roundLength
     }));
 
     const selected = [];
     for (var key in previousQuestions) {
       if (previousQuestions[key].length > MAX_PREVIOUS_QUESTIONS ||
         previousQuestions[key].length >= questions.length) {
-        previousQuestions[key] = previousQuestions[key].slice(gameLength, previousQuestions[key].length);
+        previousQuestions[key] = previousQuestions[key].slice(roundLength, previousQuestions[key].length);
       }
     }
     let i = 0;
@@ -226,7 +228,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     let found;
     let roundKey = app.data.config['rounds'][round];
     // Select new questions, avoiding previous questions
-    while (i < gameLength) {
+    while (i < roundLength) {
       found = false;
       while (checked.length !== questions.length) {
         index = utils.getRandomNumber(0, questions.length - 1);
@@ -302,12 +304,12 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
           const selectedQuestions = selectQuestions(questions, round);
           // Construct the initial response
           if (selectedQuestions) {
-            const currentQuestion = 0;
-            questionPrompt = questions[selectedQuestions[currentQuestion]];
+            const currentQuestionInRound = 0;
+            questionPrompt = questions[selectedQuestions[currentQuestionInRound]];
             app.data.fallbackCount = 0;
             let correctIndex = 0;
             selectedAnswers = [];
-            const selectedQuestionAnswers = answers[selectedQuestions[currentQuestion]];
+            const selectedQuestionAnswers = answers[selectedQuestions[currentQuestionInRound]];
             if (isTrueFalseQuestion(selectedQuestionAnswers)) {
               selectedAnswers = selectedQuestionAnswers.slice(0);
             } else {
@@ -339,11 +341,13 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
               app.data.sessionAnswers = sessionAnswers;
               app.data.sessionFollowUps = sessionFollowUps;
               app.data.questionPrompt = questionPrompt;
+              app.data.currentQuestionInRound = currentQuestionInRound;
               if (round === 0) {
                 app.data.score = 0;
+                app.data.currentQuestion = currentQuestionInRound;
               }
-              app.data.currentQuestion = currentQuestion;
               app.data.gameLength = gameLength;
+              app.data.roundLength = roundLength;
               app.data.fallbackCount = 0;
               app.data.currentRound = round;
               callback(null);
@@ -628,66 +632,71 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     const sessionQuestions = app.data.sessionQuestions;
     const answers = app.data.sessionAnswers;
     gameLength = parseInt(app.data.gameLength);
+    roundLength = parseInt(app.data.roundLength);
     let currentQuestion = parseInt(app.data.currentQuestion);
+    let currentQuestionInRound = parseInt(app.data.currentQuestionInRound);
     const score = parseInt(app.data.score);
     const currentRound = parseInt(app.data.currentRound);
-    const lastRound = app.data.config['rounds'].length - 1;
+    // const lastRound = app.data.config['rounds'].length - 1;
 
     // Last question
     if (currentQuestion === gameLength - 1) {
-      if (currentRound >= lastRound) {
-        ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_ROUND_ENDED), 'round ended');
-        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_1));
-        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_2));
-        ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CALCULATING), 'calculating');
-        ssmlResponse.pause(TTS_DELAY);
-        if (score === gameLength) {
-          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ALL_CORRECT_PROMPTS), score));
-        } else if (score === 0) {
-          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.NONE_CORRECT_PROMPTS), score));
-        } else {
-          ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.SOME_CORRECT_PROMPTS), score));
-        }
-        ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.PLAY_AGAIN_QUESTION_PROMPTS));
-        app.setContext(PLAY_AGAIN_CONTEXT);
-        if (hasScreen) {
-          app.ask(app
-            .buildRichResponse()
-            .addSimpleResponse(ssmlResponse.toString())
-            .addSuggestions([utils.YES, utils.NO]));
-        } else {
-          app.ask(ssmlResponse.toString(), selectInputPrompts());
-        }
-        persistScore();
+      ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_ROUND_ENDED), 'round ended');
+      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_1));
+      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_2));
+      ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CALCULATING), 'calculating');
+      ssmlResponse.pause(TTS_DELAY);
+      if (score === gameLength) {
+        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ALL_CORRECT_PROMPTS), score));
+      } else if (score === 0) {
+        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.NONE_CORRECT_PROMPTS), score));
       } else {
-        startNewRound(currentRound + 1, (error) => {
-          if (error) {
-            app.tell(error.message);
-          } else {
-            ssmlResponse.say('Now, going up to next level.');
-            ssmlResponse.pause(TTS_DELAY);
-            askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
-          }
-        });
+        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.SOME_CORRECT_PROMPTS), score));
       }
+      ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.PLAY_AGAIN_QUESTION_PROMPTS));
+      app.setContext(PLAY_AGAIN_CONTEXT);
+      if (hasScreen) {
+        app.ask(app
+          .buildRichResponse()
+          .addSimpleResponse(ssmlResponse.toString())
+          .addSuggestions([utils.YES, utils.NO]));
+      } else {
+        app.ask(ssmlResponse.toString(), selectInputPrompts());
+      }
+      persistScore();
+    } else if (currentQuestionInRound === roundLength - 1) {
+      // The last question of this round
+      app.data.fallbackCount = 0;
+      app.data.currentQuestion = ++currentQuestion;
+      app.data.score = score;
+      startNewRound(currentRound + 1, (error) => {
+        if (error) {
+          app.tell(error.message);
+        } else {
+          ssmlResponse.say('Now, going up to next level.');
+          ssmlResponse.pause(TTS_DELAY);
+          askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
+        }
+      });
     } else {
-      // Not the last question
+      // Not the last question of any round
       currentQuestion++;
-      if (currentQuestion === gameLength - 1 && currentRound === lastRound) {
+      currentQuestionInRound++;
+      if (currentQuestion === gameLength - 1) {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.FINAL_ROUND_PROMPTS));
-      } else if (currentQuestion % 2 === 1) {
-        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ROUND_PROMPTS), (gameLength * currentRound) + (currentQuestion + 1)));
+      } else if (currentQuestionInRound % 2 === 1) {
+        ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ROUND_PROMPTS), (currentQuestion + 1)));
       } else if (app.data.correct) {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.NEXT_QUESTION_PROMPTS));
       } else {
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.QUESTION_PROMPTS));
       }
       ssmlResponse.pause(TTS_DELAY);
-      const questionPrompt = sessionQuestions[currentQuestion];
+      const questionPrompt = sessionQuestions[currentQuestionInRound];
 
       let correctIndex = 0;
       let selectedAnswers = [];
-      const selectedQuestionAnswers = answers[currentQuestion];
+      const selectedQuestionAnswers = answers[currentQuestionInRound];
       if (isTrueFalseQuestion(selectedQuestionAnswers)) {
         selectedAnswers = selectedQuestionAnswers.slice(0);
       } else {
@@ -700,6 +709,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         app.data.questionPrompt = questionPrompt;
         app.data.fallbackCount = 0;
         app.data.currentQuestion = currentQuestion;
+        app.data.currentQuestionInRound = currentQuestionInRound;
         app.data.score = score;
         askQuestion(ssmlResponse, questionPrompt, selectedAnswers);
       } else {
@@ -718,9 +728,9 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
 
     const selectedAnswers = app.data.selectedAnswers;
     const sessionFollowUps = app.data.sessionFollowUps;
-    const currentQuestion = parseInt(app.data.currentQuestion);
+    const currentQuestionInRound = parseInt(app.data.currentQuestionInRound);
     const correctAnswer = parseInt(app.data.correctAnswer);
-    gameLength = parseInt(app.data.gameLength);
+    // gameLength = parseInt(app.data.gameLength);
     let score = parseInt(app.data.score);
 
     let number;
@@ -790,8 +800,8 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         app.data.correct = true;
         ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CORRECT), 'correct');
         ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.RIGHT_ANSWER_PROMPTS_1));
-        if (sessionFollowUps && sessionFollowUps[currentQuestion] && sessionFollowUps[currentQuestion].length > 0) {
-          ssmlResponse.say(sessionFollowUps[currentQuestion]);
+        if (sessionFollowUps && sessionFollowUps[currentQuestionInRound] && sessionFollowUps[currentQuestionInRound].length > 0) {
+          ssmlResponse.say(sessionFollowUps[currentQuestionInRound]);
         }
       } else {
         app.data.correct = false;
@@ -802,8 +812,8 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         } else {
           ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.WRONG_ANSWER_PROMPTS_1));
         }
-        if (sessionFollowUps && sessionFollowUps[currentQuestion] && sessionFollowUps[currentQuestion].length > 0) {
-          ssmlResponse.say(sessionFollowUps[currentQuestion]);
+        if (sessionFollowUps && sessionFollowUps[currentQuestionInRound] && sessionFollowUps[currentQuestionInRound].length > 0) {
+          ssmlResponse.say(sessionFollowUps[currentQuestionInRound]);
         }
       }
       app.data.score = score;
