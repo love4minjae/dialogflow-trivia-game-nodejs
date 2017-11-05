@@ -93,8 +93,8 @@ const AUDIO_TYPES = {
   AUDIO_CALCULATING: 'AUDIO_CALCULATING'
 };
 
-const goldenBellPrompts = require('./data/goldenBellPromptsDev.json');
-const goldenBellAudio = require('./data/goldenBellAudioDev.json');
+const goldenBellPrompts = require('./data/goldenBellPrompts.json');
+const goldenBellAudio = require('./data/goldenBellAudio.json');
 
 // Class to manage loading and accessing the theme prompts and audio resources
 const Themes = class {

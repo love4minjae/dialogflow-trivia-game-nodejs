@@ -91,7 +91,7 @@ const TRUE_FALSE_CONTEXT = 'true_false';
 const ITEM_INTENT = 'game.choice.item';
 
 const TTS_DELAY = '500ms';
-const TTS_DELAY_LONG = '500ms';
+const TTS_DELAY_LONG = '1000ms';
 
 const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
@@ -108,6 +108,7 @@ const DATABASE_QUESTIONS = 'questions';
 const DATABASE_DATA = 'data2';
 const DATABASE_CONFIG = 'config';
 const DATABASE_QUESTIONS_PER_GAME = 'questionsPerGame';
+const DATABASE_WRONG_ANSWER_QUIT_COUNT = 'wrongAnswerQuitCount';
 const DATABASE_QUESTIONS_PER_ROUND = 'questionsPerRound';
 const DATABASE_PREVIOUS_QUESTIONS = 'previousQuestions';
 const DATABASE_HIGHEST_SCORE = 'highestScore';
@@ -141,6 +142,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   let config;
   let gameLength = QUESTIONS_PER_GAME;
   let roundLength = QUESTIONS_PER_ROUND;
+  let quitCount = 0;
   let last = false;
   let middle = false;
   let ssmlNoInputPrompts;
@@ -231,6 +233,9 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
     let previousIndex = 0;
     let found;
     let roundKey = app.data.config['rounds'][round];
+    logger.debug(logObject('trivia', 'post', {
+      roundKey: roundKey
+    }));
     // Select new questions, avoiding previous questions
     while (i < roundLength) {
       found = false;
@@ -311,6 +316,9 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
           if (mainConfig && mainConfig[DATABASE_QUESTIONS_PER_GAME]) {
             gameLength = mainConfig[DATABASE_QUESTIONS_PER_GAME];
           }
+          if (mainConfig && mainConfig[DATABASE_WRONG_ANSWER_QUIT_COUNT]) {
+            quitCount = mainConfig[DATABASE_WRONG_ANSWER_QUIT_COUNT];
+          }
           if (config && config[DATABASE_QUESTIONS_PER_ROUND]) {
             roundLength = config[DATABASE_QUESTIONS_PER_ROUND];
           }
@@ -357,10 +365,12 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
               app.data.currentQuestionInRound = currentQuestionInRound;
               if (round === 0) {
                 app.data.score = 0;
+                app.data.wrongAnswerCount = 0;
                 app.data.currentQuestion = currentQuestionInRound;
               }
               app.data.gameLength = gameLength;
               app.data.roundLength = roundLength;
+              app.data.quitCount = quitCount;
               app.data.fallbackCount = 0;
               app.data.currentRound = round;
               callback(null);
@@ -715,6 +725,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
       let correctIndex = 0;
       let selectedAnswers = [];
       const selectedQuestionAnswers = answers[currentQuestionInRound];
+
       if (isTrueFalseQuestion(selectedQuestionAnswers)) {
         selectedAnswers = selectedQuestionAnswers.slice(0);
       } else {
@@ -823,6 +834,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         }
       } else {
         app.data.correct = false;
+        app.data.wrongAnswerCount += 1;
         ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_INCORRECT), 'incorrect');
         if (synonyms && synonyms.length > 0) {
           ssmlResponse.say(`${getRandomPrompt(PROMPT_TYPES.WRONG_ANSWER_PROMPTS_1)} ${
@@ -832,6 +844,21 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
         }
         if (sessionFollowUps && sessionFollowUps[currentQuestionInRound] && sessionFollowUps[currentQuestionInRound].length > 0) {
           ssmlResponse.say(sessionFollowUps[currentQuestionInRound]);
+        }
+        if (app.data.quitCount > 0 && app.data.wrongAnswerCount >= app.data.quitCount) {
+          // ssmlResponse.say('You have %s problems wrong. The game is Over!', app.data.wrongAnswerCount);
+          ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_1));
+          ssmlResponse.say(getRandomPrompt(PROMPT_TYPES.GAME_OVER_PROMPTS_2));
+          ssmlResponse.audio(getRandomAudio(AUDIO_TYPES.AUDIO_CALCULATING), 'calculating');
+          ssmlResponse.pause(TTS_DELAY);
+          if (score === gameLength) {
+            ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.ALL_CORRECT_PROMPTS), score));
+          } else if (score === 0) {
+            ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.NONE_CORRECT_PROMPTS), score));
+          } else {
+            ssmlResponse.say(sprintf(getRandomPrompt(PROMPT_TYPES.SOME_CORRECT_PROMPTS), score));
+          }
+          app.tell(ssmlResponse.toString());
         }
       }
       app.data.score = score;
