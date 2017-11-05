@@ -91,7 +91,7 @@ const TRUE_FALSE_CONTEXT = 'true_false';
 const ITEM_INTENT = 'game.choice.item';
 
 const TTS_DELAY = '500ms';
-const TTS_DELAY_LONG = '1000ms';
+const TTS_DELAY_LONG = '500ms';
 
 const MAX_PREVIOUS_QUESTIONS = 100;
 const SUGGESTION_CHIPS_MAX_TEXT_LENGTH = 25;
@@ -107,6 +107,8 @@ const DATABASE_QUESTIONS = 'questions';
 // const DATABASE_DATA = 'data';
 const DATABASE_DATA = 'data2';
 const DATABASE_CONFIG = 'config';
+const DATABASE_QUESTIONS_PER_GAME = 'questionsPerGame';
+const DATABASE_QUESTIONS_PER_ROUND = 'questionsPerRound';
 const DATABASE_PREVIOUS_QUESTIONS = 'previousQuestions';
 const DATABASE_HIGHEST_SCORE = 'highestScore';
 const DATABASE_LOWEST_SCORE = 'lowestScore';
@@ -136,6 +138,7 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   let questions = [];
   let answers = [];
   let followUps = [];
+  let config;
   let gameLength = QUESTIONS_PER_GAME;
   let roundLength = QUESTIONS_PER_ROUND;
   let last = false;
@@ -191,7 +194,8 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
   // Select new questions, avoiding the previous questions
   const selectQuestions = (questions, round) => {
     logger.debug(logObject('trivia', 'post', {
-      info: 'selectQuestions'
+      info: 'selectQuestions',
+      round: round
     }));
     if (!questions) {
       logger.error(logObject('trivia', 'post', {
@@ -301,6 +305,15 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
           questions = data.val()[DATABASE_QUESTIONS];
           answers = data.val()[DATABASE_ANSWERS];
           followUps = data.val()[DATABASE_FOLLOW_UPS];
+          config = data.val()[DATABASE_CONFIG];
+
+          var mainConfig = app.data.config;
+          if (mainConfig && mainConfig[DATABASE_QUESTIONS_PER_GAME]) {
+            gameLength = mainConfig[DATABASE_QUESTIONS_PER_GAME];
+          }
+          if (config && config[DATABASE_QUESTIONS_PER_ROUND]) {
+            roundLength = config[DATABASE_QUESTIONS_PER_ROUND];
+          }
           const selectedQuestions = selectQuestions(questions, round);
           // Construct the initial response
           if (selectedQuestions) {
@@ -451,6 +464,11 @@ exports.triviaGame = functions.https.onRequest((request, response) => {
             // let firstRoundName = app.data.config['rounds'][0];
             if (data.val()[DATABASE_PREVIOUS_QUESTIONS]) {
               previousQuestions = data.val()[DATABASE_PREVIOUS_QUESTIONS];
+              for (var key in app.data.config['rounds']) {
+                if (!previousQuestions[app.data.config['rounds'][key]]) {
+                  previousQuestions[app.data.config['rounds'][key]] = [];
+                }
+              }
               logger.debug(logObject('trivia', 'mainIntent', {
                 info: 'Has previous questions',
                 previousQuestions: JSON.stringify(previousQuestions)
