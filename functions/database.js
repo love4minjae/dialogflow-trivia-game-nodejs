@@ -133,7 +133,7 @@ function readSheets(auth) {
   readMainConfig(auth);
 }
 
-var tabConfig = [];
+var tabConfig = {};
 var configs = {};
 var data = {};
 
@@ -161,6 +161,7 @@ function readMainConfig(auth) {
     // console.log(mainConfig);
     configs['title'] = mainConfig['Title'];
     configs['wrongAnswerQuitCount'] = mainConfig['WrongAnswerQuitCount'];
+    configs['questionsPerGame'] = mainConfig['questionsPerGame'];
     configs['rounds'] = [];
     readTabConfig(auth);
   });
@@ -183,15 +184,16 @@ function readTabConfig(auth) {
     } else {
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
-        tabConfig[i] = {};
-        tabConfig[i]['tab'] = row[0];
-        tabConfig[i]['title'] = row[1];
-        tabConfig[i]['type'] = row[2];
-        tabConfig[i]['round'] = row[3];
-        tabConfig[i]['questionsPerRound'] = row[4];
+        var tabName = row[0];
+        tabConfig[tabName] = {};
+        // tabConfig[tabName]['tab'] = row[0];
+        tabConfig[tabName]['title'] = row[1];
+        tabConfig[tabName]['type'] = row[2];
+        tabConfig[tabName]['round'] = row[3];
+        tabConfig[tabName]['questionsPerRound'] = row[4];
 
-        if (tabConfig[i]['round'] >= 0) {
-          configs['rounds'][tabConfig[i]['round']] = tabConfig[i]['tab'];
+        if (tabConfig[tabName]['round'] >= 0) {
+          configs['rounds'][tabConfig[tabName]['round']] = tabName;
         }
       }
     }
@@ -225,9 +227,10 @@ function readData(auth, index) {
         tab['answers'][i][0] = row[1] || '';
         tab['answers'][i][1] = row[2] || '';
         tab['answers'][i][2] = row[3] || '';
-        tab['config']['title'] = tabConfig[index]['title'];
-        tab['config']['questionsPerRound'] = tabConfig[index]['questionsPerRound'];
+        tab['config']['title'] = tabConfig[configs['rounds'][index]]['title'];
+        tab['config']['questionsPerRound'] = tabConfig[configs['rounds'][index]]['questionsPerRound'];
       }
+      // console.log(tab);
       data[configs['rounds'][index]] = tab;
     }
     if (index >= configs['rounds'].length - 1) {
